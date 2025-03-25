@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UN Multilingual Translation Service</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 2rem;
+            background-color: #f8f9fa;
+        }
+        .translation-area {
+            min-height: 150px;
+            resize: vertical;
+        }
+        .result-area {
+            min-height: 150px;
+            background-color: #f8f9fa;
+            border: 1px solid #ced4da;
+            border-radius: 0.25rem;
+            padding: 0.5rem;
+        }
+        .un-logo {
+            max-height: 60px;
+            margin-right: 1rem;
+        }
+        .highlight {
+            background-color: #ffff99;
+            font-weight: bold;
+        }
+        .loading {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-md-12 text-center">
+                <h1>
+                    <img src="https://www.un.org/sites/un2.un.org/themes/bootstrap_un_organizations/images/UN-emblem-white.svg" alt="UN Logo" class="un-logo">
+                    UN Multilingual Translation Service
+                </h1>
+                <p class="text-muted">Powered by Azure AI Foundry</p>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <form id="translateForm">
+                    <div class="row mb-3">
+                        <div class="col-md-5">
+                            <label for="sourceLanguage" class="form-label">Source Language:</label>
+                            <select class="form-select" id="sourceLanguage" name="sourceLanguage">
+                                <option value="ar" selected>Arabic</option>
+                                <option value="zh-Hans">Chinese (Simplified)</option>
+                                <option value="en">English</option>
+                                <option value="fr">French</option>
+                                <option value="ru">Russian</option>
+                                <option value="es">Spanish</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-center justify-content-center">
+                            <button type="button" id="swapLanguages" class="btn btn-outline-secondary">
+                                ↔️ Swap
+                            </button>
+                        </div>
+                        <div class="col-md-5">
+                            <label for="targetLanguage" class="form-label">Target Language:</label>
+                            <select class="form-select" id="targetLanguage" name="targetLanguage">
+                                <option value="ar">Arabic</option>
+                                <option value="zh-Hans">Chinese (Simplified)</option>
+                                <option value="en" selected>English</option>
+                                <option value="fr">French</option>
+                                <option value="ru">Russian</option>
+                                <option value="es">Spanish</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="useStrictMode" name="useStrictMode" checked>
+                                <label class="form-check-label" for="useStrictMode">
+                                    <strong>UN Terminology Enforcement</strong> (use approved terminology)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="text" class="form-label">Source Text:</label>
+                            <textarea class="form-control translation-area" id="text" name="text" placeholder="Enter text to translate...">هذا بيان عن فلسطين.</textarea>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="result" class="form-label">Translation Result:</label>
+                            <div class="result-area" id="result"></div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col text-center">
+                            <button type="submit" class="btn btn-primary px-4">
+                                Translate
+                            </button>
+                            <div id="loading" class="spinner-border text-primary mt-3 loading" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header">
+                Sample Texts
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <button class="btn btn-outline-secondary w-100 mb-2 sample-text" data-lang="ar" data-text="هذا بيان عن فلسطين.">
+                            Arabic: Statement about Palestine
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-outline-secondary w-100 mb-2 sample-text" data-lang="en" data-text="The Secretary-General visited Palestine last week.">
+                            English: Secretary-General Visit
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-outline-secondary w-100 mb-2 sample-text" data-lang="fr" data-text="La Palestine est un sujet important pour l'ONU.">
+                            French: Palestine Statement
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('translateForm');
+            const sourceLanguageSelect = document.getElementById('sourceLanguage');
+            const targetLanguageSelect = document.getElementById('targetLanguage');
+            const textArea = document.getElementById('text');
+            const resultDiv = document.getElementById('result');
+            const swapLanguagesBtn = document.getElementById('swapLanguages');
+            const loading = document.getElementById('loading');
+            const sampleTextBtns = document.querySelectorAll('.sample-text');
+            
+            // Replace with your actual function URL and key
+            const functionUrl = 'https://un-translate-demo.azurewebsites.net/api/translate?code=Q5nifQGyPVoya9vSS314IphqC3lZcNlV7yX2_RFhPoRjAzFuiyqqBw==';
+
+            // Handle form submission
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const sourceText = textArea.value.trim();
+                if (!sourceText) return;
+                
+                // Show loading spinner
+                loading.style.display = 'inline-block';
+                
+                // Build request payload
+                const payload = {
+                    text: sourceText,
+                    sourceLanguage: sourceLanguageSelect.value,
+                    targetLanguage: targetLanguageSelect.value,
+                    useStrictMode: document.getElementById('useStrictMode').checked
+                };
+                
+                try {
+                    // Call Azure Function
+                    const response = await fetch(functionUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    // Process the response
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Display the translated text only, not the full JSON
+                        resultDiv.textContent = data.translatedText;
+                        
+                        // Highlight UN terms if strict mode is on
+                        if (payload.useStrictMode) {
+                            highlightTerms();
+                        }
+                    } else {
+                        const errorData = await response.json();
+                        resultDiv.textContent = `Error: ${errorData.error || response.statusText}`;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    resultDiv.textContent = 'An error occurred during translation.';
+                } finally {
+                    // Hide loading spinner
+                    loading.style.display = 'none';
+                }
+            });
+            
+            // Function to highlight terminology terms
+            function highlightTerms() {
+                const text = resultDiv.textContent;
+                const terms = [
+                    'occupied Palestinian territory',
+                    'Secretary-General of the United Nations'
+                ];
+                
+                let highlightedText = text;
+                terms.forEach(term => {
+                    const regex = new RegExp(term, 'gi');
+                    highlightedText = highlightedText.replace(regex, match => 
+                        `<span class="highlight">${match}</span>`);
+                });
+                
+                resultDiv.innerHTML = highlightedText;
+            }
+            
+            // Swap languages button
+            swapLanguagesBtn.addEventListener('click', function() {
+                const sourceValue = sourceLanguageSelect.value;
+                const targetValue = targetLanguageSelect.value;
+                
+                sourceLanguageSelect.value = targetValue;
+                targetLanguageSelect.value = sourceValue;
+            });
+            
+            // Sample text buttons
+            sampleTextBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const lang = this.getAttribute('data-lang');
+                    const text = this.getAttribute('data-text');
+                    
+                    sourceLanguageSelect.value = lang;
+                    textArea.value = text;
+                    resultDiv.textContent = '';
+                });
+            });
+        });
+    </script>
+</body>
+</html>
